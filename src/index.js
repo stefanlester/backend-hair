@@ -15,6 +15,12 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Log all requests
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+  next();
+});
+
 // Simple in-memory user store (temporary - MongoDB disabled)
 let users = [];
 let nextUserId = 1;
@@ -187,7 +193,7 @@ app.get('/api/appointments/my', auth, (req, res) => {
 
 // Create new appointment (protected)
 app.post('/api/appointments', auth, (req, res) => {
-  const { service, date, time, notes, customerName, customerPhone, customerEmail } = req.body;
+  const { service, date, time, notes, customerName, customerPhone, customerEmail, stylistId } = req.body;
   if (!service || !date || !time) {
     return res.status(400).json({ error: 'Service, date, and time are required' });
   }
@@ -202,6 +208,7 @@ app.post('/api/appointments', auth, (req, res) => {
     customerName: customerName || '',
     customerPhone: customerPhone || '',
     customerEmail: customerEmail || '',
+    stylistId: stylistId || null,
     status: 'pending_payment', // Changed from 'pending' to 'pending_payment'
     paymentStatus: 'unpaid',
     depositPaid: false,
@@ -256,5 +263,24 @@ app.post('/api/appointments/:id/confirm-payment', auth, (req, res) => {
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`\n🚀 Chi's Luxe Beauties Backend Server Running!`);
+  console.log(`📍 URL: http://localhost:${PORT}`);
+  console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`\n✅ Available Endpoints:`);
+  console.log(`   - POST   /api/signup`);
+  console.log(`   - POST   /api/login`);
+  console.log(`   - GET    /api/products`);
+  console.log(`   - POST   /api/products (auth)`);
+  console.log(`   - PUT    /api/products/:id (auth)`);
+  console.log(`   - DELETE /api/products/:id (auth)`);
+  console.log(`   - GET    /api/appointments`);
+  console.log(`   - GET    /api/appointments/my (auth)`);
+  console.log(`   - POST   /api/appointments (auth)`);
+  console.log(`   - PUT    /api/appointments/:id (auth)`);
+  console.log(`   - DELETE /api/appointments/:id (auth)`);
+  console.log(`   - POST   /api/appointments/:id/confirm-payment (auth)`);
+  console.log(`   - POST   /api/create-payment-intent (auth)`);
+  console.log(`   - POST   /api/orders (auth)`);
+  console.log(`\n👥 In-memory storage active (MongoDB disabled)`);
+  console.log(`📊 Current Data: ${users.length} users, ${products.length} products, ${appointments.length} appointments\n`);
 });
