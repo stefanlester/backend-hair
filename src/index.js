@@ -19,6 +19,10 @@ app.use(express.json());
 let users = [];
 let nextUserId = 1;
 
+// In-memory appointments store
+let appointments = [];
+let nextAppointmentId = 1;
+
 // JWT auth middleware
 function auth(req, res, next) {
   const authHeader = req.headers.authorization;
@@ -167,6 +171,87 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), (req,
     // Optionally update order status in DB
   }
   res.json({ received: true });
+});
+
+// Appointments API
+// Get all appointments
+app.get('/api/appointments', (req, res) => {
+  res.json(appointments);
+});
+
+// Get appointments for logged-in user
+app.get('/api/appointments/my', auth, (req, res) => {
+  const userAppointments = appointments.filter(a => a.userId === req.user.userId);
+  res.json(userAppointments);
+});
+
+// Create new appointment (protected)
+app.post('/api/appointments', auth, (req, res) => {
+  const { service, date, time, notes, customerName, customerPhone, customerEmail } = req.body;
+  if (!service || !date || !time) {
+    return res.status(400).json({ error: 'Service, date, and time are required' });
+  }
+  
+  const appointment = {
+    id: nextAppointmentId++,
+    userId: req.user.userId,
+    service,
+    date,
+    time,
+    notes: notes || '',
+    customerName: customerName || '',
+    customerPhone: customerPhone || '',
+    customerEmail: customerEmail || '',
+    status: 'pending_payment', // Changed from 'pending' to 'pending_payment'
+    paymentStatus: 'unpaid',
+    depositPaid: false,
+    createdAt: new Date().toISOString(),
+  };
+  
+  appointments.push(appointment);
+  res.status(201).json(appointment);
+});
+
+// Update appointment status (admin/protected)
+app.put('/api/appointments/:id', auth, (req, res) => {
+  const id = parseInt(req.params.id);
+  const idx = appointments.findIndex(a => a.id === id);
+  if (idx === -1) return res.status(404).json({ error: 'Appointment not found' });
+  
+  const { status, notes } = req.body;
+  if (status) appointments[idx].status = status;
+  if (notes !== undefined) appointments[idx].notes = notes;
+  
+  res.json(appointments[idx]);
+});
+
+// Delete appointment
+app.delete('/api/appointments/:id', auth, (req, res) => {
+  const id = parseInt(req.params.id);
+  const idx = appointments.findIndex(a => a.id === id);
+  if (idx === -1) return res.status(404).json({ error: 'Appointment not found' });
+  
+  appointments.splice(idx, 1);
+  res.json({ success: true });
+});
+
+// Confirm appointment payment (mark deposit as paid)
+app.post('/api/appointments/:id/confirm-payment', auth, (req, res) => {
+  const id = parseInt(req.params.id);
+  const { paymentIntentId, depositAmount } = req.body;
+  const idx = appointments.findIndex(a => a.id === id);
+  
+  if (idx === -1) return res.status(404).json({ error: 'Appointment not found' });
+  
+  // Update appointment with payment info
+  appointments[idx].depositPaid = true;
+  appointments[idx].paymentStatus = 'deposit_paid';
+  appointments[idx].paymentIntentId = paymentIntentId;
+  appointments[idx].depositAmount = depositAmount;
+  appointments[idx].status = 'pending'; // Change from pending_payment to pending (awaiting admin confirmation)
+  appointments[idx].paidAt = new Date().toISOString();
+  
+  res.json(appointments[idx]);
 });
 
 const PORT = process.env.PORT || 5000;
