@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: chis-luxe-beauties-api
+    runtime: node
+    buildCommand: npm install
+    startCommand: node src/index.js
+    envVars:
+      - key: JWT_SECRET
+        generateValue: true
+      - key: NODE_ENV
+        value: production
